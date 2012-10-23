@@ -23,13 +23,14 @@ var NONE        = 4,
 
 Pacman.FPS = 30;
 
-Pacman.Ghost = function (game, map, colour) {
+Pacman.Ghost = function (game, map, colour, path) {
 
     var position  = null,
         direction = null,
         eatable   = null,
         eaten     = null,
-        due       = null;
+        due       = null,
+        current_path_step = null;
     
     function getNewCoord(dir, current) { 
         
@@ -80,7 +81,7 @@ Pacman.Ghost = function (game, map, colour) {
         eatable = null;
         position = {"x": 90, "y": 80};
         direction = getRandomDirection();
-        due = getRandomDirection();
+        current_path_step = -1;
     };
     
     function onWholeSquare(x) {
@@ -215,49 +216,26 @@ Pacman.Ghost = function (game, map, colour) {
 
         return false;
     };
+
+    function is_path_finished() {
+        return current_path_step >= path.length;
+    }
     
     function move(ctx) {
-        
         var oldPos = position,
             onGrid = onGridSquare(position),
             npos   = null;
-        
-        if (due !== direction) {
-            
-            npos = getNewCoord(due, position);
-            
-            if (onGrid &&
-                map.isFloorSpace({
-                    "y":pointToCoord(nextSquare(npos.y, due)),
-                    "x":pointToCoord(nextSquare(npos.x, due))})) {
-                direction = due;
-            } else {
-                npos = null;
+
+        if (!is_path_finished()) {
+            if (onGrid) {
+                current_path_step++;
+            }
+
+            if (!is_path_finished()) {
+                direction = due = path[current_path_step];
+                position = getNewCoord(due, position);
             }
         }
-        
-        if (npos === null) {
-            npos = getNewCoord(direction, position);
-        }
-        
-        if (onGrid &&
-            map.isWallSpace({
-                "y" : pointToCoord(nextSquare(npos.y, direction)),
-                "x" : pointToCoord(nextSquare(npos.x, direction))
-            })) {
-            
-            due = getRandomDirection();            
-            return move(ctx);
-        }
-
-        position = npos;        
-        
-        var tmp = pane(position);
-        if (tmp) { 
-            position = tmp;
-        }
-        
-        due = getRandomDirection();
         
         return {
             "new" : position,
@@ -1048,7 +1026,7 @@ var PACMAN = (function () {
         }, map);
 
         for (i = 0, len = ghostSpecs.length; i < len; i += 1) {
-            ghost = new Pacman.Ghost({"getTick":getTick}, map, ghostSpecs[i]);
+            ghost = new Pacman.Ghost({"getTick":getTick}, map, ghostSpecs[i], Pacman.PATHS[i]);
             ghosts.push(ghost);
         }
         
@@ -1251,6 +1229,15 @@ Pacman.WALLS = [
      {"line": [11, 11.5]}, {"curve": [11.5, 11.5, 11.5, 11]},
      {"line": [11.5, 10]}, {"curve": [11.5, 9.5, 11, 9.5]},
      {"line": [10.5, 9.5]}]
+];
+
+// hardcoded paths for ghosts to move to pills
+// 4 pills, 4 paths
+Pacman.PATHS = [
+    [LEFT, UP, UP, LEFT, LEFT, UP, UP, LEFT, LEFT, LEFT, LEFT, LEFT, UP, UP],
+    [RIGHT, UP, UP, RIGHT, RIGHT, UP, UP, RIGHT, RIGHT, RIGHT, RIGHT, RIGHT, UP, UP],
+    [LEFT, LEFT, LEFT, DOWN, DOWN, DOWN, DOWN, DOWN, DOWN, LEFT, LEFT, LEFT, LEFT, LEFT, DOWN, DOWN],
+    [RIGHT, RIGHT, RIGHT, DOWN, DOWN, DOWN, DOWN, DOWN, DOWN, RIGHT, RIGHT, RIGHT, RIGHT, RIGHT, DOWN, DOWN]
 ];
 
 Object.prototype.clone = function () {
