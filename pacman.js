@@ -63,7 +63,7 @@ Pacman.Ghost = function (game, map, colour, path) {
     };
     
     function isDangerous() {
-        return eaten === null;
+        return eaten === null && !isVunerable();
     };
 
     function isHidden() { 
@@ -404,10 +404,17 @@ Pacman.User = function (game, map) {
         }
         
         position = npos;        
+        
+        return {
+            "new" : position,
+            "old" : oldPosition
+        };
+    };
+    
+    function update() {
         nextWhole = next(position, direction);
-        
         block = map.block(nextWhole);        
-        
+
         if ((isMidSquare(position.y) || isMidSquare(position.x)) &&
             block === Pacman.BISCUIT || block === Pacman.PILL) {
             
@@ -422,12 +429,7 @@ Pacman.User = function (game, map) {
             if (block === Pacman.PILL) { 
                 game.eatenPill();
             }
-        }   
-                
-        return {
-            "new" : position,
-            "old" : oldPosition
-        };
+        }
     };
 
     function isMidSquare(x) { 
@@ -501,6 +503,7 @@ Pacman.User = function (game, map) {
         "theScore"      : theScore,
         "keyDown"       : keyDown,
         "move"          : move,
+        "update"        : update,
         "newLevel"      : newLevel,
         "reset"         : reset,
         "resetPosition" : resetPosition
@@ -892,6 +895,7 @@ var PACMAN = (function () {
 
         var diff, u, i, len, nScore;
         
+        // move everything
         ghostPos = [];
 
         for (i = 0, len = ghosts.length; i < len; i += 1) {
@@ -899,6 +903,24 @@ var PACMAN = (function () {
         }
         u = user.move(ctx);
         
+        userPos = u["new"];
+        
+        // check for death
+        for (i = 0, len = ghosts.length; i < len; i += 1) {
+            if (ghosts[i].isDangerous()) {
+                if (collided(userPos, ghostPos[i]["new"])) {
+                    audio.play("die");
+                    setState(DYING);
+                    timerStart = tick;
+                    return;
+                }
+            }
+        }
+
+        // we survived, continue updates
+        user.update()
+
+        // draw a bit
         for (i = 0, len = ghosts.length; i < len; i += 1) {
             redrawBlock(ghostPos[i].old);
         }
@@ -908,12 +930,11 @@ var PACMAN = (function () {
             ghosts[i].draw(ctx);
         }                     
         user.draw(ctx);
-        
-        userPos = u["new"];
-        
+
+        // eat ghosts
         for (i = 0, len = ghosts.length; i < len; i += 1) {
-            if (collided(userPos, ghostPos[i]["new"])) {
-                if (ghosts[i].isVunerable()) { 
+            if (ghosts[i].isVunerable()) { 
+                if (collided(userPos, ghostPos[i]["new"])) {
                     audio.play("eatghost");
                     ghosts[i].eat();
                     eatenCount += 1;
@@ -922,13 +943,9 @@ var PACMAN = (function () {
                     user.addScore(nScore);                    
                     setState(EATEN_PAUSE);
                     timerStart = tick;
-                } else if (ghosts[i].isDangerous()) {
-                    audio.play("die");
-                    setState(DYING);
-                    timerStart = tick;
                 }
             }
-        }                             
+        }
     };
 
     function mainLoop() {
@@ -989,7 +1006,7 @@ var PACMAN = (function () {
             ghosts[i].makeEatable(ctx);
         }        
     };
-    
+
     function completedLevel() {
         setState(WAITING);
         level += 1;
